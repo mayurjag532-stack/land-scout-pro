@@ -4,6 +4,14 @@
   "description": "Private land scouting and property evaluation app",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#07120c",
-  "theme_color": "#07120c"
+  "background_color": "#07120C",
+  "theme_color": "#07120C",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }
