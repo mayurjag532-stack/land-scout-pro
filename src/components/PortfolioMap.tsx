@@ -294,7 +294,7 @@ export default function PortfolioMap({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => onSearchChange("")}
                 aria-label="Clear search"
-                className="w-9 h-9 grid place-items-center rounded-xl text-field-muted hover:text-field-text shrink-0"
+                className="w-11 h-11 grid place-items-center rounded-xl text-field-muted hover:text-field-text shrink-0"
               >
                 <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
