@@ -361,7 +361,7 @@ export default function PropertyList({
                               href={googleMapsPointUrl(p.location.lat, p.location.lng)}
                               target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
                               aria-label="Open in Google Maps"
-                              className="w-9 h-9 grid place-items-center rounded-xl bg-white/95 border border-field-line text-field-muted hover:text-field-accent shadow-sm"
+                              className="w-11 h-11 grid place-items-center rounded-xl bg-white/95 border border-field-line text-field-muted hover:text-field-accent shadow-sm"
                             >
                               <PinIcon />
                             </a>
@@ -370,7 +370,7 @@ export default function PropertyList({
                             type="button"
                             aria-label={`Delete ${p.name}`}
                             onClick={async (e) => { e.stopPropagation(); if (confirm(`Delete ${p.name}? Its saved photos will also be removed. Create a Full Backup first if you may need it later.`)) await onDelete(p.id); }}
-                            className="w-9 h-9 grid place-items-center rounded-xl bg-white/95 border border-field-line text-field-bad hover:border-field-bad/50 shadow-sm"
+                            className="w-11 h-11 grid place-items-center rounded-xl bg-white/95 border border-field-line text-field-bad hover:border-field-bad/50 shadow-sm"
                           >
                             <TrashIcon />
                           </button>
