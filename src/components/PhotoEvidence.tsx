@@ -18,18 +18,49 @@ export default function PhotoEvidence({photos,onAdd,onRemove,onUpdate}:{photos:P
  async function handleFiles(e:React.ChangeEvent<HTMLInputElement>){const files=Array.from(e.target.files||[]);if(!files.length)return;setError("");setBusy(true);try{for(const file of files){const dataUrl=await resizeImage(file);onAdd({id:`photo_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,category:activeCategory,dataUrl,addedAt:Date.now(),caption:""});}}catch(err){setError(err instanceof Error?err.message:"Could not add evidence.");}finally{setBusy(false);if(inputRef.current)inputRef.current.value="";}}
  const grouped=CATEGORIES.map(c=>({...c,count:photos.filter(p=>p.category===c.id).length}));
  const coveredCategories=grouped.filter(c=>c.count>0).length;
- return <section className="bg-field-card border border-field-line rounded-xl p-4">
-   <div className="flex items-start justify-between gap-3 mb-3">
-     <div><p className="text-[11px] uppercase tracking-[.16em] text-field-muted">Evidence vault</p><h3 className="text-field-text font-semibold text-[16px] mt-0.5">Site photos & documents</h3><p className="text-field-muted text-xs mt-1">Private on this device · compressed for reliable field storage.</p></div>
+ return <section className="bg-field-card border border-field-line rounded-xl p-4 md:p-5" aria-label="Evidence vault">
+   <div className="flex items-start justify-between gap-3 mb-4">
+     <div>
+       <p className="ps-kicker">Evidence vault</p>
+       <h3 className="font-display text-field-text text-[21px] mt-1">Site photos & documents</h3>
+       <p className="text-field-muted text-xs mt-1.5">Private on this device · compressed for reliable field storage.</p>
+     </div>
      <div className="text-right shrink-0">
-       <span className="text-xs text-field-text border border-field-line rounded-full px-2.5 py-1 tabular-nums">{photos.length} items</span>
-       <p className="text-field-muted text-[10px] mt-1.5">{coveredCategories}/{CATEGORIES.length} categories</p>
+       <span className="text-xs text-field-text border border-field-line rounded-full px-2.5 py-1 tabular-nums">{photos.length} item{photos.length===1?"":"s"}</span>
+       <p className="text-field-muted text-[10px] mt-1.5 tabular-nums">{coveredCategories}/{CATEGORIES.length} categories</p>
      </div>
    </div>
-   <div className="flex gap-2 overflow-x-auto pb-2">{grouped.map(c=><button key={c.id} onClick={()=>setActiveCategory(c.id)} className={`text-xs rounded-full px-3 py-1.5 border whitespace-nowrap ${activeCategory===c.id?"bg-field-accent text-field-bg border-field-accent":c.count?"bg-field-panel text-field-muted border-field-line":"bg-transparent text-field-muted border-dashed border-field-line"}`}>{c.label}{c.count?` · ${c.count}`:""}</button>)}</div>
+
+   <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1" role="tablist" aria-label="Evidence categories">
+     {grouped.map(c=><button key={c.id} role="tab" aria-selected={activeCategory===c.id} onClick={()=>setActiveCategory(c.id)} className={`text-xs rounded-full px-3.5 py-2 border whitespace-nowrap ${activeCategory===c.id?"bg-field-accent text-field-bg border-field-accent font-semibold":c.count?"bg-field-panel text-field-muted border-field-line":"bg-transparent text-field-muted border-dashed border-field-line"}`}>{c.label}{c.count?` · ${c.count}`:""}</button>)}
+   </div>
+
    <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" id="evidence-input"/>
-   <label htmlFor="evidence-input" className={`block w-full text-center py-3 rounded-xl border border-field-accent font-medium cursor-pointer ${busy?"opacity-50 pointer-events-none":"bg-field-panel text-field-accent"}`}>{busy?"Processing evidence…":`Add ${CATEGORIES.find(c=>c.id===activeCategory)?.label}`}</label>
-   {error&&<p className="text-field-bad text-xs mt-2">{error}</p>}
-   {photos.length>0?<div className="grid grid-cols-2 gap-3 mt-4">{photos.map(p=><article key={p.id} className="bg-field-panel border border-field-line rounded-xl overflow-hidden"><div className="relative"><img src={p.dataUrl} loading="lazy" decoding="async" className="w-full aspect-[4/3] object-cover"/><button onClick={()=>{if(confirm("Remove this evidence item?"))onRemove(p.id)}} className="absolute top-2 right-2 bg-black/70 hover:bg-black/85 text-white rounded-full w-11 h-11 grid place-items-center" aria-label="Remove evidence"><XIcon/></button><span className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] rounded-full px-2 py-1">{CATEGORIES.find(c=>c.id===p.category)?.label}</span></div><div className="p-2.5"><input value={p.caption||""} onChange={e=>onUpdate?.(p.id,{caption:e.target.value})} placeholder="Add a short caption…" className="w-full bg-transparent border-b border-field-line text-xs text-field-text py-1.5"/><p className="text-[10px] text-field-muted mt-1.5">{new Date(p.addedAt).toLocaleString()}</p></div></article>)}</div>:<div className="mt-4 rounded-xl border border-dashed border-field-line p-6 text-center"><div className="w-10 h-10 mx-auto rounded-full bg-field-panel border border-field-line grid place-items-center text-field-accent"><CameraEmptyIcon/></div><p className="text-sm text-field-muted mt-3">No evidence captured yet.</p><p className="text-xs text-field-muted mt-1">Capture access, plot edges, surroundings and relevant documents.</p></div>}
+   <label htmlFor="evidence-input" className={`block w-full text-center py-3.5 rounded-xl border border-field-accent font-medium cursor-pointer mt-1 ${busy?"opacity-50 pointer-events-none":"bg-field-panel text-field-accent"}`}>{busy?"Processing evidence…":`Add ${CATEGORIES.find(c=>c.id===activeCategory)?.label}`}</label>
+   {error&&<p role="alert" className="text-field-bad text-xs mt-2">{error}</p>}
+
+   {photos.length>0?(
+     <div className="grid grid-cols-2 gap-3 mt-4">
+       {photos.map((p,i)=>(
+         <article key={p.id} className="bg-field-panel border border-field-line rounded-xl overflow-hidden ps-stagger" style={{ animationDelay: `${Math.min(i,8)*40}ms` }}>
+           <div className="relative">
+             <img src={p.dataUrl} loading="lazy" decoding="async" alt={p.caption || `${CATEGORIES.find(c=>c.id===p.category)?.label} evidence photo`} className="w-full aspect-[4/3] object-cover"/>
+             <button onClick={()=>{if(confirm("Remove this evidence item?"))onRemove(p.id)}} className="absolute top-2 right-2 bg-black/70 hover:bg-black/85 text-white rounded-full w-11 h-11 grid place-items-center" aria-label="Remove evidence"><XIcon/></button>
+             <span className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] rounded-full px-2 py-1">{CATEGORIES.find(c=>c.id===p.category)?.label}</span>
+           </div>
+           <div className="p-3">
+             <input value={p.caption||""} onChange={e=>onUpdate?.(p.id,{caption:e.target.value})} placeholder="Add a short caption…" aria-label="Photo caption" className="w-full bg-transparent border-b border-field-line text-xs text-field-text py-1.5"/>
+             <p className="text-[10px] text-field-muted mt-1.5 tabular-nums"><time dateTime={new Date(p.addedAt).toISOString()}>{new Date(p.addedAt).toLocaleString()}</time> · captured on this device</p>
+           </div>
+         </article>
+       ))}
+     </div>
+   ):(
+     <div className="mt-4 rounded-xl border border-dashed border-field-line p-8 text-center">
+       <div className="w-11 h-11 mx-auto rounded-full bg-field-panel border border-field-line grid place-items-center text-field-accent"><CameraEmptyIcon/></div>
+       <p className="font-display text-field-text text-[17px] mt-3">No evidence captured yet</p>
+       <p className="text-xs text-field-muted mt-1 max-w-[38ch] mx-auto">Capture access, plot edges, surroundings and relevant documents. Each photo is timestamped as field evidence.</p>
+     </div>
+   )}
  </section>;
 }

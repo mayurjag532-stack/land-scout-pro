@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Circle, useMap } from "react-leaflet";
+import { MapContainer, Marker, Circle, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { CALM_TILE_URL, CALM_ATTRIBUTION } from "./MapView";
+import { ThemeTiles } from "./MapView";
 import type { PropertyRecord, Score } from "../types";
 import type { Tone } from "./ui/StatusTag";
 
@@ -264,7 +264,7 @@ export default function PortfolioMap({
         zoomControl={false}
         ref={mapRef}
       >
-        <TileLayer attribution={CALM_ATTRIBUTION} url={CALM_TILE_URL} maxZoom={20} />
+        <ThemeTiles />
         <CameraRig items={items} selectedId={selectedId} flySignal={flySignal} />
         <ClusterLayer
           items={items}
@@ -354,7 +354,7 @@ export default function PortfolioMap({
 
       {/* Map caption: quiet context, never noise */}
       <div className="absolute left-3 bottom-3 z-[400] pointer-events-none hidden sm:block">
-        <p className="text-[10px] text-field-muted bg-white/70 backdrop-blur px-2 py-1 rounded-md">
+        <p className="text-[10px] text-field-muted ps-surface-float-soft backdrop-blur px-2 py-1 rounded-md">
           {locatedCount === items.length ? `${items.length} plotted` : `${locatedCount} of ${items.length} plotted`}
         </p>
       </div>

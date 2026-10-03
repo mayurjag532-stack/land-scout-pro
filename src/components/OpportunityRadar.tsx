@@ -77,13 +77,28 @@ export default function OpportunityRadar({ leads, onDelete, onDiscovered, onDele
     }
   }
 
+  const scopeSummary = scope.mode === "near_me"
+    ? (scope.lat ? ([scope.locality, scope.taluka, scope.district, scope.state].filter(Boolean).join(" · ") || "GPS position captured") : "No position yet")
+    : (scope.state.trim() ? [scope.locality, scope.taluka, scope.district, scope.state].filter(Boolean).join(" · ") : "No area chosen");
+
   return (
-    <main className="px-4 pt-4 pb-24 max-w-xl mx-auto space-y-5">
-      <section><p className="text-[10px] uppercase tracking-[.18em] text-field-accent font-bold">Opportunity Radar — India</p><h2 className="font-display text-[30px] mt-1 text-field-text">Find land opportunities</h2><p className="text-sm text-field-muted mt-1">Choose where. Plot Scout does the searching, verification and filtering.</p></section>
-      <section className="rounded-2xl border border-field-line bg-field-card p-4 space-y-4">
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={() => setScope((s) => ({ ...s, mode: "near_me" }))} className={`rounded-xl border p-3 text-sm ${scope.mode === "near_me" ? "border-field-accent text-field-accent" : "border-field-line text-field-muted"}`}>Near me</button>
-          <button onClick={() => setScope((s) => ({ ...s, mode: "selected" }))} className={`rounded-xl border p-3 text-sm ${scope.mode === "selected" ? "border-field-accent text-field-accent" : "border-field-line text-field-muted"}`}>Choose area</button>
+    <main className="px-4 pt-6 pb-24 max-w-xl mx-auto">
+      {/* Hero: one insight — captured leads */}
+      <section className="ps-fade">
+        <p className="ps-kicker">Opportunity Radar — India</p>
+        <h2 className="font-display text-field-text text-[32px] mt-1.5">Find land opportunities</h2>
+        <div className="mt-5 flex items-end gap-3">
+          <p className="font-display text-field-text tabular-nums leading-none" style={{ fontSize: "var(--text-hero)" }}>{leads.length}</p>
+          <p className="text-field-muted text-sm pb-1.5">lead{leads.length === 1 ? "" : "s"} captured{scope.lat || scope.state.trim() ? ` · scanning ${scopeSummary.split(" · ")[0]}` : ""}</p>
+        </div>
+        <p className="text-sm text-field-muted mt-2 max-w-[52ch]">Choose where. Plot Scout does the searching, verification and filtering.</p>
+      </section>
+
+      {/* Scope: calm, progressive */}
+      <section className="mt-7 rounded-2xl border border-field-line bg-field-card p-4 md:p-5 space-y-4">
+        <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Search scope">
+          <button role="tab" aria-selected={scope.mode === "near_me"} onClick={() => setScope((s) => ({ ...s, mode: "near_me" }))} className={`rounded-xl border px-3 py-3 text-sm font-medium ${scope.mode === "near_me" ? "border-field-accent text-field-accent bg-field-accent/10" : "border-field-line text-field-muted"}`}>Near me</button>
+          <button role="tab" aria-selected={scope.mode === "selected"} onClick={() => setScope((s) => ({ ...s, mode: "selected" }))} className={`rounded-xl border px-3 py-3 text-sm font-medium ${scope.mode === "selected" ? "border-field-accent text-field-accent bg-field-accent/10" : "border-field-line text-field-muted"}`}>Choose area</button>
         </div>
         {scope.mode === "near_me" ? (
           <div>
@@ -100,26 +115,34 @@ export default function OpportunityRadar({ leads, onDelete, onDiscovered, onDele
             ))}
           </div>
         )}
-        <label className="block text-xs text-field-muted">Search radius: {scope.radiusKm} km<input type="range" min="2" max="100" value={scope.radiusKm} onChange={(e) => setScope((s) => ({ ...s, radiusKm: Number(e.target.value) }))} className="w-full mt-2" /></label>
+        <label className="block text-xs text-field-muted">Search radius: <span className="text-field-text font-semibold tabular-nums">{scope.radiusKm} km</span><input type="range" min="2" max="100" value={scope.radiusKm} onChange={(e) => setScope((s) => ({ ...s, radiusKm: Number(e.target.value) }))} className="w-full mt-2" aria-label="Search radius in kilometres" /></label>
         <button disabled={busy} onClick={discover} className="w-full rounded-xl border border-field-accent bg-field-accent/10 text-field-accent font-semibold py-3">{busy ? "Working..." : "Find opportunities"}</button>
-        {msg && <p className="text-xs text-field-muted">{msg}</p>}
+        {msg && <p role="status" className="text-xs text-field-muted leading-relaxed">{msg}</p>}
       </section>
-      <div className="rounded-xl border border-field-warn/30 bg-field-card p-3 text-sm"><span className="font-semibold text-field-warn">Evidence rule:</span> <span className="text-field-muted">Search context is never treated as property location. No verified location - no opportunity score.</span></div>
-      <section className="rounded-2xl border border-field-line bg-field-card p-3 space-y-3">
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setSelected(selected.length === leads.length ? [] : leads.map((l) => l.id))} disabled={!leads.length} className="rounded-xl border border-field-line px-3 py-2 text-xs font-semibold">
-            {selected.length === leads.length && leads.length ? "Clear Selection" : "Select All"}
-          </button>
-          <button type="button" disabled={!selected.length} onClick={async () => { if (!confirm(`Delete ${selected.length} selected leads?`)) return; if (onDeleteSelected) await onDeleteSelected(selected); else for (const id of selected) await Promise.resolve(onDelete(id)); setSelected([]); }} className="rounded-xl border border-field-line px-3 py-2 text-xs font-semibold">
-            Delete Selected ({selected.length})
-          </button>
-          <button type="button" disabled={!leads.length} onClick={async () => { if (!confirm(`Delete all ${leads.length} leads? This cannot be undone.`)) return; if (onDeleteAll) await onDeleteAll(); else for (const lead of leads) await Promise.resolve(onDelete(lead.id)); setSelected([]); }} className="rounded-xl border border-field-line px-3 py-2 text-xs font-semibold">
-            Delete All ({leads.length})
-          </button>
-        </div>
-        {!!leads.length && <div className="max-h-44 overflow-auto space-y-1">{leads.map((l) => <label key={l.id} className="flex items-center gap-2 text-xs text-field-muted"><input type="checkbox" checked={selected.includes(l.id)} onChange={() => setSelected((s) => s.includes(l.id) ? s.filter((id) => id !== l.id) : [...s, l.id])} /><span className="truncate">{l.sharedTitle || "Untitled lead"}</span></label>)}</div>}
-      </section>
-      <LeadInbox leads={leads} onDelete={onDelete} onUpdate={onUpdate} embedded />
+
+      {/* Evidence rule: quiet line, not a warning box */}
+      <p className="text-[11px] text-field-muted mt-4 leading-relaxed max-w-[62ch]"><span className="font-semibold text-field-text">Evidence rule:</span> search context is never treated as property location. No verified location — no opportunity score.</p>
+
+      {/* Selection management: quiet, only when it matters */}
+      {leads.length > 0 && (
+        <section className="mt-6 rounded-2xl border border-field-line bg-field-card p-3.5 space-y-3" aria-label="Manage leads">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setSelected(selected.length === leads.length ? [] : leads.map((l) => l.id))} className="rounded-xl border border-field-line px-3 py-2 text-xs font-semibold text-field-text">
+              {selected.length === leads.length ? "Clear Selection" : "Select All"}
+            </button>
+            <button type="button" disabled={!selected.length} onClick={async () => { if (!confirm(`Delete ${selected.length} selected leads?`)) return; if (onDeleteSelected) await onDeleteSelected(selected); else for (const id of selected) await Promise.resolve(onDelete(id)); setSelected([]); }} className="rounded-xl border border-field-line px-3 py-2 text-xs font-semibold text-field-text disabled:opacity-40">
+              Delete Selected ({selected.length})
+            </button>
+            <button type="button" onClick={async () => { if (!confirm(`Delete all ${leads.length} leads? This cannot be undone.`)) return; if (onDeleteAll) await onDeleteAll(); else for (const lead of leads) await Promise.resolve(onDelete(lead.id)); setSelected([]); }} className="rounded-xl border border-field-line px-3 py-2 text-xs font-semibold text-field-bad">
+              Delete All ({leads.length})
+            </button>
+          </div>
+          <div className="max-h-44 overflow-auto space-y-1">{leads.map((l) => <label key={l.id} className="flex items-center gap-2.5 text-xs text-field-muted py-1 min-h-[44px]"><input type="checkbox" checked={selected.includes(l.id)} onChange={() => setSelected((s) => s.includes(l.id) ? s.filter((id) => id !== l.id) : [...s, l.id])} className="!w-5 !h-5 shrink-0" /><span className="truncate">{l.sharedTitle || "Untitled lead"}</span></label>)}</div>
+        </section>
+      )}
+      <div className="mt-5">
+        <LeadInbox leads={leads} onDelete={onDelete} onUpdate={onUpdate} embedded />
+      </div>
     </main>
   );
 }
