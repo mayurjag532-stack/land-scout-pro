@@ -17,6 +17,24 @@ export function getPlan():Plan{return isDevPreview?readPreview():trustedPlan;}
 export function setPlan(plan:Plan){if(!isDevPreview)return;localStorage.setItem(KEY,plan);trustedPlan=plan;emit();}
 export function canUse(plan:Plan,feature:Feature){if(!isDevPreview && feature==="professional_report" && trustedEntitlements.some(e=>e.product_code==="report_single")) return true;return ACCESS[feature].includes(plan);}
 export function requiredPlan(feature:Feature):Plan{return ACCESS[feature][0];}
+/**
+ * Returns the authenticated user's email as verified by the Supabase auth
+ * server. The localStorage session is client-tamperable and must NOT be
+ * trusted for identity — this endpoint validates the JWT server-side and
+ * returns the real account email. Returns "" if the token is invalid.
+ */
+async function getVerifiedEmail():Promise<string>{
+  const s=getSession();
+  if(!s||!backendConfigured)return "";
+  try{
+    const r=await fetch(`${runtimeConfig.supabaseUrl}/auth/v1/user`,{
+      headers:{apikey:runtimeConfig.supabaseAnonKey,Authorization:`Bearer ${s.access_token}`}
+    });
+    if(!r.ok)return "";
+    const user=await r.json();
+    return (user?.email||"").toLowerCase();
+  }catch{return "";}
+}
 export async function syncTrustedEntitlements():Promise<Plan>{
   if(isDevPreview){trustedPlan=readPreview();emit();return trustedPlan;}
   trustedPlan="BASIC";trustedEntitlements=[];
@@ -24,12 +42,13 @@ export async function syncTrustedEntitlements():Promise<Plan>{
   try{
     trustedEntitlements=await getServerEntitlements();
     trustedPlan=trustedEntitlements.some(e=>e.product_code==="investor_annual")?"PRO":"BASIC";
-    /* Owner/test accounts: the authenticated session email is checked against
-       the VITE_OWNER_EMAILS allowlist (server-side env config, never in repo).
-       This grants the real PRO tier through the standard entitlement machinery —
+    /* Owner/test accounts: the SERVER-VERIFIED session email is checked against
+       the VITE_OWNER_EMAILS allowlist (public env config, not a secret — the
+       security comes from Supabase validating the token, not from hiding the
+       address). Grants the real PRO tier through the standard machinery;
        customer rules and checks are unchanged. */
     if(trustedPlan!=="PRO"){
-      const email=getSession()?.user?.email?.toLowerCase()||"";
+      const email=await getVerifiedEmail();
       if(email&&runtimeConfig.ownerEmails.includes(email))trustedPlan="PRO";
     }
   }catch{trustedPlan="BASIC";trustedEntitlements=[];}
