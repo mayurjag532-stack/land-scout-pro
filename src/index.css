@@ -37,12 +37,24 @@
   --line-strong: #C2B89F;
   --text: #171815;
   --text-dim: #706E68;
+  --text-faint: #A39B88;
   --accent: #263D30;      /* Forest — primary actions, selection */
+  --accent-strong: #1E3327;
+  --accent-soft: rgba(38, 61, 48, .08);
   --gold: #B9955A;        /* Muted gold — premium accents only */
   --good: #2E7D4F;
   --warn: #8A5F1E;
   --bad: #B4432F;
   --neutral: #706E68;
+  --overlay: rgba(23, 24, 21, .5);
+
+  /* Typography scale — editorial display + quiet sans */
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+  --text-hero: clamp(34px, 7vw, 52px);
+  --text-title: clamp(26px, 4.5vw, 38px);
+  --text-h2: 21px;
+  --text-h3: 17px;
 
   --radius: 16px;
   --radius-sm: 10px;
@@ -67,6 +79,102 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ==========================================================================
+   DARK MODE — sophisticated spatial dark, not inverted light.
+   Deep graphite + forest surfaces + warm ivory type + muted gold accents.
+   ========================================================================== */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #171815;
+  --surface-1: #1F211D;
+  --surface-2: #262924;
+  --surface-3: #2E322B;
+  --line: #31362E;
+  --line-strong: #424840;
+  --text: #F7F3EC;
+  --text-dim: #A8A49A;
+  --text-faint: #7C786E;
+  --accent: #9DBFA9;        /* lightened forest — text/icons on dark */
+  --accent-strong: #B7D2C1;
+  --accent-soft: rgba(157, 191, 169, .12);
+  --gold: #C9A86A;
+  --good: #6FAE82;
+  --warn: #C9A86A;
+  --bad: #D97A63;
+  --neutral: #A8A49A;
+  --overlay: rgba(10, 11, 10, .62);
+
+  --shadow-sm: 0 4px 8px rgba(0, 0, 0, .3);
+  --shadow-md: 0 8px 16px rgba(0, 0, 0, .36);
+  --shadow-sheet: 0 16px 32px rgba(0, 0, 0, .44);
+  --shadow-marker: 0 6px 14px rgba(0, 0, 0, .5);
+}
+
+[data-theme="dark"] .ps-map-float {
+  background: rgba(31, 33, 29, .9);
+  border-color: var(--line-strong);
+}
+[data-theme="dark"] .ps-marker {
+  background: rgba(31, 33, 29, .96);
+  border-color: rgba(157, 191, 169, .4);
+  color: var(--accent);
+}
+[data-theme="dark"] .ps-marker-selected {
+  background: var(--accent);
+  color: #171815;
+  border-color: var(--accent);
+}
+[data-theme="dark"] .ps-marker-selected .ps-marker-dot {
+  outline: 2px solid rgba(23, 24, 21, .45);
+}
+[data-theme="dark"] .ps-cluster {
+  background: rgba(31, 33, 29, .96);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+[data-theme="dark"] .ps-marker-order {
+  background: var(--accent);
+  color: #171815;
+}
+[data-theme="dark"] nav.fixed {
+  background: rgba(31, 33, 29, .92) !important;
+  border-color: var(--line-strong) !important;
+}
+[data-theme="dark"] nav.fixed button.text-field-accent {
+  background: rgba(157, 191, 169, .14) !important;
+}
+[data-theme="dark"] .leaflet-container { background: #1a1c19; }
+[data-theme="dark"] .leaflet-control-attribution {
+  background: rgba(23, 24, 21, .8) !important;
+}
+[data-theme="dark"] .skeleton {
+  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder { color: #7C786E !important; }
+[data-theme="dark"] input:focus, [data-theme="dark"] textarea:focus, [data-theme="dark"] select:focus {
+  box-shadow: 0 0 0 3px rgba(157, 191, 169, .16) !important;
+}
+[data-theme="dark"] button.bg-field-accent,
+[data-theme="dark"] .bg-field-accent.text-field-bg {
+  background: #F7F3EC !important;
+  color: #171815 !important;
+  font-weight: 600;
+}
+[data-theme="dark"] button.bg-field-accent:hover,
+[data-theme="dark"] .bg-field-accent.text-field-bg:hover {
+  background: #FFFFFF !important;
+}
+/* Primary CTA in dark mode: ivory button, graphite text */
+[data-theme="dark"] .ps-cta-primary {
+  background: #F7F3EC !important;
+  color: #171815 !important;
+  border: 0 !important;
+  font-weight: 650;
+}
+[data-theme="dark"] .ps-cta-primary:hover { background: #FFFFFF !important; }
 
 html, body, #root { min-height: 100%; }
 html { background: var(--canvas); scroll-behavior: smooth; }
@@ -109,7 +217,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* ---- field-* Tailwind-driven surfaces (used directly in component JSX) ---- */
 .bg-field-bg { background: var(--canvas) !important; }
-.bg-field-card {
+/* Theme-aware floating surface (replaces hardcoded bg-white/*) */
+.ps-surface-float { background: color-mix(in srgb, var(--surface-1) 94%, transparent) !important; }
+.ps-surface-float-soft { background: color-mix(in srgb, var(--surface-1) 72%, transparent) !important; }.bg-field-card {
   background: var(--surface-1) !important;
   border-color: var(--line) !important;
   box-shadow: var(--shadow-sm);
@@ -331,13 +441,68 @@ header .w-9.h-9 {
 .ps-rail-state { font-size: 9px; color: var(--text-dim); white-space: nowrap; margin-left: auto; }
 .ps-content { min-width: 0; }
 .ps-section { scroll-margin-top: 14px; }
+/* Editorial section labels: Fraunces title, quiet number, hairline rule */
 .ps-section-label {
-  display: flex; align-items: center; gap: 10px; margin: 28px 2px 12px;
-  color: var(--text-dim); font-size: 10px; text-transform: uppercase; letter-spacing: .14em; font-weight: 700;
+  display: flex; align-items: center; gap: 12px; margin: 38px 2px 16px;
 }
-.ps-section:first-of-type .ps-section-label { margin-top: 4px; }
+.ps-section:first-of-type .ps-section-label { margin-top: 6px; }
 .ps-section-label::after { content: ""; height: 1px; flex: 1; background: var(--line); }
-.ps-section-label .ps-section-num { color: var(--warn); }
+.ps-section-num {
+  font-size: 11px; font-weight: 700; letter-spacing: .12em; color: var(--warn); flex: none;
+}
+.ps-section-title {
+  font-family: var(--font-display); font-size: 22px; font-weight: 600;
+  letter-spacing: -.01em; color: var(--text); line-height: 1.15;
+}
+
+/* ---- spatial dossier hero ---- */
+.ps-dossier-visual {
+  position: relative; height: 230px; overflow: hidden;
+  background: var(--surface-2); border-bottom: 1px solid var(--line);
+}
+@media (min-width: 768px) { .ps-dossier-visual { height: 300px; } }
+.ps-dossier-body { padding: 26px 26px 24px; }
+.ps-dossier-title {
+  font-size: clamp(30px, 6vw, 46px); line-height: 1.06; letter-spacing: -.015em;
+  font-weight: 600; margin-top: 10px; color: var(--text); overflow-wrap: anywhere;
+}
+.ps-dossier-decision { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.ps-dossier-confidence { font-size: 11px; color: var(--text-dim); }
+.ps-dossier-score { margin-left: auto; }
+/* One hero metric — the most important figure the data supports */
+.ps-hero-metric { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.ps-hero-metric-label {
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--text-dim); font-weight: 700;
+}
+.ps-hero-metric-value {
+  font-size: clamp(30px, 6vw, 44px); line-height: 1.05; letter-spacing: -.015em;
+  color: var(--text); margin-top: 6px; font-variant-numeric: tabular-nums;
+}
+.ps-hero-metric-suffix {
+  font-family: var(--font-sans); font-size: 15px; color: var(--text-dim);
+  letter-spacing: 0; margin-left: 6px; font-weight: 500;
+}
+/* Key facts — quiet, scannable, no boxes */
+.ps-facts {
+  display: flex; flex-wrap: wrap; gap: 6px 22px;
+  margin: 16px 0 0; padding: 14px 0 0; border-top: 1px solid var(--line);
+}
+.ps-fact { display: flex; align-items: baseline; gap: 6px; margin: 0; padding: 3px 0; font-size: 12px; color: var(--text-dim); }
+.ps-fact dt { font-weight: 500; }
+.ps-fact dd { margin: 0; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ps-dossier-save { margin-top: 18px; }
+/* Save indicator: calm tactile pill, honest states */
+.ps-save {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px 6px 7px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface-2);
+}
+.ps-save-text { font-size: 11px; color: var(--text-dim); }
+@media (max-width: 760px) {
+  .ps-dossier-body { padding: 20px 18px 18px; }
+  .ps-section-title { font-size: 19px; }
+}
 
 @keyframes ps-just-ready { 0% { box-shadow: 0 0 0 0 rgba(46, 125, 79, .4); } 100% { box-shadow: 0 0 0 7px rgba(46, 125, 79, 0); } }
 .ps-rail a.ps-just-ready { background: rgba(46, 125, 79, .07); }

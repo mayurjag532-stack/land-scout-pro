@@ -4,7 +4,9 @@ import App from "./App";
 import "./index.css";
 import { installGlobalErrorBoundary } from "./services/errors";
 import { track } from "./services/analytics";
+import { initTheme } from "./utils/theme";
 
+initTheme();
 installGlobalErrorBoundary();
 track("app_opened");
 

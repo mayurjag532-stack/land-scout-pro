@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Circle, Popup, useMap } from "react-leaflet";
+import { MapContainer, Marker, Circle, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect } from "react";
 import L from "leaflet";
@@ -8,8 +8,17 @@ import { googleMapsPointUrl } from "../utils/geo";
 // Calm, muted basemap: cartographic clarity without visual noise, so property
 // markers, selection and intelligence overlays stay the loudest thing on screen.
 export const CALM_TILE_URL = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+export const CALM_TILE_URL_DARK = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 export const CALM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+
+/** Returns the basemap URL matching the current theme. */
+export function calmTileUrl(): string {
+  if (typeof document !== "undefined" && document.documentElement.dataset.theme === "dark") {
+    return CALM_TILE_URL_DARK;
+  }
+  return CALM_TILE_URL;
+}
 
 // Editorial field marker — forest pin, ivory core. Inline SVG keeps it
 // available offline with no extra request.
@@ -27,6 +36,22 @@ function Recenter({ lat, lng, smooth }: { lat: number; lng: number; smooth?: boo
     if (smooth && !reduced) map.panTo([lat, lng], { animate: true, duration: 0.56 });
     else map.setView([lat, lng], map.getZoom());
   }, [lat, lng]);
+  return null;
+}
+
+/** Swaps the basemap between light and dark CARTO tiles when the theme changes. */
+export function ThemeTiles() {
+  const map = useMap();
+  useEffect(() => {
+    const layer = L.tileLayer(calmTileUrl(), { attribution: CALM_ATTRIBUTION, maxZoom: 20 });
+    layer.addTo(map);
+    const onChange = () => layer.setUrl(calmTileUrl());
+    window.addEventListener("plot-scout-theme-change", onChange);
+    return () => {
+      window.removeEventListener("plot-scout-theme-change", onChange);
+      map.removeLayer(layer);
+    };
+  }, [map]);
   return null;
 }
 
@@ -66,7 +91,7 @@ export default function MapView({
         keyboard={interactive}
         attributionControl
       >
-        <TileLayer attribution={CALM_ATTRIBUTION} url={CALM_TILE_URL} maxZoom={20} />
+        <ThemeTiles />
         <Recenter key={recenterKey} lat={location.lat} lng={location.lng} />
         <Circle
           center={[location.lat, location.lng]}
