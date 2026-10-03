@@ -79,7 +79,7 @@ export default function OpportunityRadar({ leads, onDelete, onDiscovered, onDele
 
   return (
     <main className="px-4 pt-4 pb-24 max-w-xl mx-auto space-y-5">
-      <section><p className="text-[11px] uppercase tracking-[.18em] text-field-muted">Opportunity Radar - India</p><h2 className="text-2xl font-semibold tracking-tight mt-1">Find land opportunities</h2><p className="text-sm text-field-muted mt-1">Choose where. Plot Scout does the searching, verification and filtering.</p></section>
+      <section><p className="text-[10px] uppercase tracking-[.18em] text-field-accent font-bold">Opportunity Radar — India</p><h2 className="font-display text-[30px] mt-1 text-field-text">Find land opportunities</h2><p className="text-sm text-field-muted mt-1">Choose where. Plot Scout does the searching, verification and filtering.</p></section>
       <section className="rounded-2xl border border-field-line bg-field-card p-4 space-y-4">
         <div className="grid grid-cols-2 gap-2">
           <button onClick={() => setScope((s) => ({ ...s, mode: "near_me" }))} className={`rounded-xl border p-3 text-sm ${scope.mode === "near_me" ? "border-field-accent text-field-accent" : "border-field-line text-field-muted"}`}>Near me</button>

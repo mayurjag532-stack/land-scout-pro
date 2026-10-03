@@ -28,7 +28,7 @@ export default function Settings({properties,onDataChanged,buyerProfile}:{proper
   async function persist(){const ok=await requestPersistentStorage();setMessage(ok===true?"Persistent storage granted by this browser.":ok===false?"Browser did not grant persistent storage. Keep regular backups.":"Persistent storage is not supported here.");await refreshInfo();}
 
   return <div className="px-4 py-4 max-w-xl mx-auto pb-24 md:pb-10 space-y-4">
-    <div><p className="text-[11px] uppercase tracking-[.18em] text-field-muted mb-1">Device & privacy</p><h2 className="text-field-text text-2xl font-semibold tracking-tight">Settings</h2></div>
+    <div><p className="text-[10px] uppercase tracking-[.18em] text-field-accent font-bold mb-1">Device & privacy</p><h2 className="text-field-text font-display text-[30px]">Settings</h2></div>
     {(message||error)&&<div className={`rounded-xl p-3 text-sm border ${error?"border-field-bad/50 text-field-bad bg-field-card":"border-field-accent/50 text-field-accent bg-field-card"}`}>{error||message}</div>}
 
     <AccountAccess/>
