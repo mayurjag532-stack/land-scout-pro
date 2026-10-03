@@ -3,6 +3,7 @@ import { MapContainer, Marker, Circle, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { ThemeTiles } from "./MapView";
+import BasemapSwitcher from "./BasemapSwitcher";
 import type { PropertyRecord, Score } from "../types";
 import type { Tone } from "./ui/StatusTag";
 
@@ -324,7 +325,8 @@ export default function PortfolioMap({
       </div>
 
       {/* Floating controls: zoom + locate */}
-      <div className="absolute right-3 bottom-3 z-[500] flex flex-col gap-2">
+      <div className="absolute right-3 bottom-3 z-[500] flex flex-col gap-2 items-end">
+        <BasemapSwitcher />
         <button onClick={locateMe} aria-label={geoState === "locating" ? "Locating…" : "Show my location"} title="Show my location" className="ps-map-float ps-float-btn">
           {geoState === "locating"
             ? <span className="w-4 h-4 rounded-full border-2 border-field-accent border-t-transparent animate-spin" />

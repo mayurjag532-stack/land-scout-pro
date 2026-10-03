@@ -10,6 +10,7 @@ import { visitCompletion } from "../utils/visitState";
 import { DecisionTag, decisionTone, Tone } from "./ui/StatusTag";
 import { ScoreRing } from "./ui/ScoreRing";
 import type { PortfolioItem } from "./PortfolioMap";
+import PropertySheet from "./PropertySheet";
 const PortfolioMap = lazy(() => import("./PortfolioMap"));
 const PropertyComparison = lazy(() => import("./PropertyComparison"));
 
@@ -448,6 +449,15 @@ export default function PropertyList({
         <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center text-field-muted text-sm">Preparing comparison…</div>}>
           <PropertyComparison properties={comparisonProperties} onClose={() => setShowComparison(false)} />
         </Suspense>
+      )}
+
+      {/* Mobile bottom sheet — marker → camera → sheet (peek/half/full) → dossier */}
+      {!compareMode && (
+        <PropertySheet
+          item={selectedId ? scored.find((s) => s.property.id === selectedId) ?? null : null}
+          onClose={() => setSelectedId(null)}
+          onOpen={onOpen}
+        />
       )}
     </div>
   );

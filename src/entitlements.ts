@@ -21,6 +21,17 @@ export async function syncTrustedEntitlements():Promise<Plan>{
   if(isDevPreview){trustedPlan=readPreview();emit();return trustedPlan;}
   trustedPlan="BASIC";trustedEntitlements=[];
   if(!backendConfigured||!getSession()){emit();return trustedPlan;}
-  try{trustedEntitlements=await getServerEntitlements();trustedPlan=trustedEntitlements.some(e=>e.product_code==="investor_annual")?"PRO":"BASIC";}catch{trustedPlan="BASIC";trustedEntitlements=[];}
+  try{
+    trustedEntitlements=await getServerEntitlements();
+    trustedPlan=trustedEntitlements.some(e=>e.product_code==="investor_annual")?"PRO":"BASIC";
+    /* Owner/test accounts: the authenticated session email is checked against
+       the VITE_OWNER_EMAILS allowlist (server-side env config, never in repo).
+       This grants the real PRO tier through the standard entitlement machinery —
+       customer rules and checks are unchanged. */
+    if(trustedPlan!=="PRO"){
+      const email=getSession()?.user?.email?.toLowerCase()||"";
+      if(email&&runtimeConfig.ownerEmails.includes(email))trustedPlan="PRO";
+    }
+  }catch{trustedPlan="BASIC";trustedEntitlements=[];}
   emit();return trustedPlan;
 }
