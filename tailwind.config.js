@@ -5,22 +5,26 @@ export default {
     extend: {
       colors: {
         field: {
-          bg: "#0A0C0F",
-          panel: "#14171C",
-          card: "#15181D",
-          raised: "#1C2028",
-          line: "#262B33",
-          lineStrong: "#3A4048",
-          text: "#F1F3F5",
-          muted: "#8B929C",
-          accent: "#5EA8FF",
-          warn: "#E0A937",
-          bad: "#E5695E",
-          good: "#3FBD82"
+          bg: "#F7F3EC",      // Canvas / Ivory
+          panel: "#EEE9E0",   // Soft Surface
+          card: "#FFFFFF",    // White product surfaces
+          raised: "#E6DECD",  // Deeper soft surface (tracks, wells)
+          line: "#D9D2C7",
+          lineStrong: "#C2B89F",
+          text: "#171815",    // Ink / Graphite
+          muted: "#706E68",   // Stone
+          accent: "#263D30",  // Forest — primary actions
+          gold: "#B9955A",    // Muted gold — sparing premium accents
+          warn: "#8A5F1E",
+          bad: "#B4432F",
+          good: "#2E7D4F"
         }
       },
-      fontFamily: { sans: ["Inter", "ui-sans-serif", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"] },
-      borderRadius: { xl: "14px", lg: "10px" }
+      fontFamily: {
+        sans: ["Inter", "ui-sans-serif", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        display: ["Fraunces", "Georgia", "Times New Roman", "serif"]
+      },
+      borderRadius: { xl: "16px", lg: "10px" }
     }
   },
   plugins: []
