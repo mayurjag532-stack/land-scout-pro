@@ -21,7 +21,7 @@ const QUICK_SEARCHES = [
   "Bus Stop"
 ];
 
-const CATEGORY_DOT: Record<string, string> = { road: "#8B929C", residential: "#5EA8FF", sports: "#C77DFF", education: "#3FBD82", access: "#E0A937" };
+const CATEGORY_DOT: Record<string, string> = { road: "#706E68", residential: "#263D30", sports: "#B9955A", education: "#2E7D4F", access: "#8A5F1E" };
 
 function PoiList({ title, items, emptyLabel, dot }: { title: string; items: MapPoi[]; emptyLabel: string; dot: string }) {
   return (

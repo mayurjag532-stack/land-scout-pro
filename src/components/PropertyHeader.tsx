@@ -49,7 +49,7 @@ export default function PropertyHeader({
         <input
           value={property.name}
           onChange={(e) => onNameChange(e.target.value)}
-          className="ps-title-input flex-1 min-w-0 text-field-text font-semibold text-[16px] outline-none px-0"
+          className="ps-title-input flex-1 min-w-0 text-field-text font-display font-semibold text-[19px] outline-none px-0"
         />
 
         {property.location && (
