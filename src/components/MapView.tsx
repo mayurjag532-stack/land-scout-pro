@@ -4,13 +4,21 @@ import { useEffect } from "react";
 import L from "leaflet";
 import { CapturedLocation, MapPoi } from "../types";
 import { googleMapsPointUrl } from "../utils/geo";
+import { getBasemap } from "../utils/basemap";
+import BasemapSwitcher from "./BasemapSwitcher";
 
 // Calm, muted basemap: cartographic clarity without visual noise, so property
 // markers, selection and intelligence overlays stay the loudest thing on screen.
 export const CALM_TILE_URL = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 export const CALM_TILE_URL_DARK = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+/* Esri World Imagery — real satellite/aerial tiles, no API key required. */
+export const SATELLITE_TILE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+/* Esri reference overlay — boundaries, places and road labels for Hybrid mode. */
+export const HYBRID_REF_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 export const CALM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+export const SATELLITE_ATTRIBUTION =
+  'Imagery &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, Maxar, Earthstar Geographics';
 
 /** Returns the basemap URL matching the current theme. */
 export function calmTileUrl(): string {
@@ -39,17 +47,37 @@ function Recenter({ lat, lng, smooth }: { lat: number; lng: number; smooth?: boo
   return null;
 }
 
-/** Swaps the basemap between light and dark CARTO tiles when the theme changes. */
+/** Basemap layer: themed CARTO vector-style tiles, Esri satellite imagery, or
+ *  hybrid (imagery + reference labels). Reacts to theme and basemap changes. */
 export function ThemeTiles() {
   const map = useMap();
   useEffect(() => {
-    const layer = L.tileLayer(calmTileUrl(), { attribution: CALM_ATTRIBUTION, maxZoom: 20 });
-    layer.addTo(map);
-    const onChange = () => layer.setUrl(calmTileUrl());
-    window.addEventListener("plot-scout-theme-change", onChange);
+    const base = L.tileLayer(calmTileUrl(), { attribution: CALM_ATTRIBUTION, maxZoom: 20 });
+    const sat = L.tileLayer(SATELLITE_TILE_URL, { attribution: SATELLITE_ATTRIBUTION, maxZoom: 19 });
+    const ref = L.tileLayer(HYBRID_REF_URL, { maxZoom: 19 });
+    let active: L.TileLayer[] = [];
+    const apply = () => {
+      const b = getBasemap();
+      const dark = typeof document !== "undefined" && document.documentElement.dataset.theme === "dark";
+      for (const l of active) map.removeLayer(l);
+      if (b === "satellite") {
+        sat.addTo(map); active = [sat];
+      } else if (b === "hybrid") {
+        sat.addTo(map); ref.addTo(map); active = [sat, ref];
+      } else {
+        base.setUrl(dark ? CALM_TILE_URL_DARK : CALM_TILE_URL);
+        base.addTo(map); active = [base];
+      }
+    };
+    apply();
+    const onBasemap = () => apply();
+    const onTheme = () => { if (getBasemap() === "map") apply(); };
+    window.addEventListener("plot-scout-basemap-change", onBasemap);
+    window.addEventListener("plot-scout-theme-change", onTheme);
     return () => {
-      window.removeEventListener("plot-scout-theme-change", onChange);
-      map.removeLayer(layer);
+      window.removeEventListener("plot-scout-basemap-change", onBasemap);
+      window.removeEventListener("plot-scout-theme-change", onTheme);
+      for (const l of active) map.removeLayer(l);
     };
   }, [map]);
   return null;
@@ -78,7 +106,7 @@ export default function MapView({
   interactive?: boolean;
 }) {
   return (
-    <div className="rounded-xl overflow-hidden border border-field-line" style={{ height }}>
+    <div className="rounded-xl overflow-hidden border border-field-line relative" style={{ height }}>
       <MapContainer
         center={[location.lat, location.lng]}
         zoom={16}
@@ -126,6 +154,11 @@ export default function MapView({
           </Circle>
         ))}
       </MapContainer>
+      {interactive && (
+        <div className="absolute right-2 bottom-2 z-[500]">
+          <BasemapSwitcher />
+        </div>
+      )}
     </div>
   );
 }
