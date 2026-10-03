@@ -1,13 +1,16 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { PropertyRecord } from "../types";
 import { computeScore } from "../utils/scoring";
-import { googleMapsPointUrl } from "../utils/geo";
+import { economics } from "../utils/economics";
+import { formatDistance, googleMapsPointUrl } from "../utils/geo";
 import { getProperty } from "../db";
 import { canUse, Plan } from "../entitlements";
 import { beforeTokenDecision, BeforeTokenDecision } from "../utils/decision";
 import { visitCompletion } from "../utils/visitState";
-import { DecisionTag, decisionTone } from "./ui/StatusTag";
+import { DecisionTag, decisionTone, Tone } from "./ui/StatusTag";
 import { ScoreRing } from "./ui/ScoreRing";
+import type { PortfolioItem } from "./PortfolioMap";
+const PortfolioMap = lazy(() => import("./PortfolioMap"));
 const PropertyComparison = lazy(() => import("./PropertyComparison"));
 
 const STATUS_FILTERS: { id: "ALL" | BeforeTokenDecision; label: string }[] = [
@@ -39,12 +42,25 @@ function relativeTime(ts: number) {
   return new Date(ts).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
+/** Compact Indian money for card headlines — presentation only. */
+function fmtMoney(n: number | null | undefined): string | null {
+  if (n == null) return null;
+  const v = Math.round(n);
+  if (v >= 1e7) return `₹${(v / 1e7).toFixed(v % 1e7 === 0 ? 0 : 2).replace(/\.00$/, "")} Cr`;
+  if (v >= 1e5) return `₹${(v / 1e5).toFixed(v % 1e5 === 0 ? 0 : 1).replace(/\.0$/, "")} L`;
+  if (v >= 1e3) return `₹${(v / 1e3).toFixed(1).replace(/\.0$/, "")}K`;
+  return `₹${v.toLocaleString("en-IN")}`;
+}
+
 function PinIcon() { return <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>; }
-function TagIcon() { return <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m20.6 13.4-8.2 8.2a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1 0-2.8l8.2-8.2a2 2 0 0 1 1.4-.6H19a2 2 0 0 1 2 2v6.2a2 2 0 0 1-.4 1.4Z" /><circle cx="14.5" cy="8.5" r="1.2" /></svg>; }
-function RulerIcon() { return <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="18" height="10" rx="1.5" /><path d="M7 7v3M11 7v3M15 7v3" /></svg>; }
-function SearchIcon() { return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>; }
+function CameraIcon() { return <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .9-.5l.6-1a1 1 0 0 1 .9-.5h4.8a1 1 0 0 1 .9.5l.6 1a1 1 0 0 0 .9.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" /><circle cx="12" cy="13" r="3.2" /></svg>; }
+function FlagIcon() { return <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22V4c4-2.5 8 2.5 12 0v10c-4 2.5-8-2.5-12 0" /></svg>; }
 function ChevronIcon() { return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>; }
 function TrashIcon() { return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-.9 12.1a2 2 0 0 1-2 1.9H8.9a2 2 0 0 1-2-1.9L6 7" /></svg>; }
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
 
 export default function PropertyList({
   properties,
@@ -64,11 +80,20 @@ export default function PropertyList({
   const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [compareMode, setCompareMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonProperties, setComparisonProperties] = useState<PropertyRecord[]>([]);
   const [comparisonLoading, setComparisonLoading] = useState(false);
+  const cardRefs = useRef(new Map<string, HTMLDivElement>());
 
-  const scored = useMemo(() => properties.map((p) => ({ property: p, score: computeScore(p) })), [properties]);
+  const scored: PortfolioItem[] = useMemo(
+    () => properties.map((p) => {
+      const score = computeScore(p);
+      const decision = beforeTokenDecision(p);
+      return { property: p, score, tone: decision.tone as Tone };
+    }),
+    [properties]
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -82,37 +107,37 @@ export default function PropertyList({
   const sorted = useMemo(() => {
     const list = [...filtered];
     switch (sortBy) {
-      case "oldest":
-        return list.sort((a, b) => a.property.createdAt - b.property.createdAt);
-      case "score_desc":
-        return list.sort((a, b) => b.score.total - a.score.total);
-      case "score_asc":
-        return list.sort((a, b) => a.score.total - b.score.total);
-      case "price_desc":
-        return list.sort((a, b) => (b.property.price.quotedPrice ?? -1) - (a.property.price.quotedPrice ?? -1));
-      case "price_asc":
-        return list.sort((a, b) => {
-          const av = a.property.price.quotedPrice;
-          const bv = b.property.price.quotedPrice;
-          if (av === null || av === undefined) return 1;
-          if (bv === null || bv === undefined) return -1;
-          return av - bv;
-        });
-      case "area_desc":
-        return list.sort((a, b) => (b.property.price.areaSqft ?? -1) - (a.property.price.areaSqft ?? -1));
-      case "area_asc":
-        return list.sort((a, b) => {
-          const av = a.property.price.areaSqft;
-          const bv = b.property.price.areaSqft;
-          if (av === null || av === undefined) return 1;
-          if (bv === null || bv === undefined) return -1;
-          return av - bv;
-        });
+      case "oldest": return list.sort((a, b) => a.property.createdAt - b.property.createdAt);
+      case "score_desc": return list.sort((a, b) => b.score.total - a.score.total);
+      case "score_asc": return list.sort((a, b) => a.score.total - b.score.total);
+      case "price_desc": return list.sort((a, b) => (b.property.price.quotedPrice ?? -1) - (a.property.price.quotedPrice ?? -1));
+      case "price_asc": return list.sort((a, b) => {
+        const av = a.property.price.quotedPrice, bv = b.property.price.quotedPrice;
+        if (av == null) return 1; if (bv == null) return -1; return av - bv;
+      });
+      case "area_desc": return list.sort((a, b) => (b.property.price.areaSqft ?? -1) - (a.property.price.areaSqft ?? -1));
+      case "area_asc": return list.sort((a, b) => {
+        const av = a.property.price.areaSqft, bv = b.property.price.areaSqft;
+        if (av == null) return 1; if (bv == null) return -1; return av - bv;
+      });
       case "newest":
-      default:
-        return list.sort((a, b) => b.property.createdAt - a.property.createdAt);
+      default: return list.sort((a, b) => b.property.createdAt - a.property.createdAt);
     }
   }, [filtered, sortBy]);
+
+  function scrollCardIntoView(id: string) {
+    requestAnimationFrame(() => {
+      cardRefs.current.get(id)?.scrollIntoView({
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+        block: "nearest"
+      });
+    });
+  }
+
+  function handleSelect(id: string | null) {
+    setSelectedId(id);
+    if (id) scrollCardIntoView(id);
+  }
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < 5 ? [...prev, id] : prev);
@@ -122,6 +147,11 @@ export default function PropertyList({
     setCompareMode(false);
     setSelectedIds([]);
     setShowComparison(false);
+  }
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("ALL");
   }
 
   async function openComparison() {
@@ -134,175 +164,232 @@ export default function PropertyList({
     } finally { setComparisonLoading(false); }
   }
 
+  const filterKey = `${statusFilter}|${sortBy}`;
+
   return (
-    <div className="px-4 md:px-8 py-5 md:py-7 max-w-xl mx-auto pb-24 md:pb-10">
-      <div className="flex items-center justify-between mb-5">
-        <div><p className="text-[10px] uppercase tracking-[.18em] text-field-muted mb-1">Field portfolio</p><h2 className="text-field-text text-[26px] font-bold tracking-tight">Saved Properties</h2></div>
-        <div className="text-right shrink-0">
-          <p className="text-field-text text-xl font-bold leading-none">{properties.length}</p>
-          <p className="text-field-muted text-[10px] mt-0.5">{properties.length === 1 ? "record" : "records"}</p>
+    <div className="px-4 md:px-8 pt-5 md:pt-7 max-w-xl mx-auto pb-28 md:pb-12">
+      {/* Header — red-square: the portfolio itself */}
+      <div className="flex items-end justify-between mb-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-[.18em] text-field-accent font-bold mb-1.5">Field portfolio</p>
+          <h2 className="font-display text-[30px] md:text-[36px] leading-none text-field-text">Saved Properties</h2>
+        </div>
+        <div className="text-right shrink-0 pb-0.5">
+          <p className="text-field-text text-2xl font-bold leading-none tabular-nums" key={properties.length} >{properties.length}</p>
+          <p className="text-field-muted text-[10px] mt-1 uppercase tracking-[.08em]">{properties.length === 1 ? "record" : "records"}</p>
         </div>
       </div>
 
       {properties.length === 0 ? (
-        <div className="bg-field-card border border-field-line rounded-xl p-8 text-center">
-          <div className="w-12 h-12 mx-auto rounded-full bg-field-panel border border-field-line grid place-items-center text-field-accent"><PinIcon /></div>
-          <p className="text-field-text font-semibold mt-4">No property visits saved yet</p>
-          <p className="text-field-muted text-sm mt-1.5 max-w-sm mx-auto">Start your first visit to capture a location, evidence and price signal — Plot Scout builds the decision record as you go.</p>
-          <button onClick={onNew} className="mt-5 bg-field-accent text-field-bg font-semibold px-6 py-3 rounded-xl">
+        <div className="bg-field-card border border-field-line rounded-3xl p-8 md:p-12 text-center ps-rise">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-field-panel border border-field-line grid place-items-center text-field-accent"><PinIcon /></div>
+          <p className="font-display text-field-text text-[22px] mt-5">No property visits saved yet</p>
+          <p className="text-field-muted text-sm mt-2 max-w-sm mx-auto leading-relaxed">Start your first visit to capture a location, evidence and price signal — Plot Scout builds the decision record as you go.</p>
+          <button onClick={onNew} className="mt-6 bg-field-accent text-sm font-semibold px-7 py-3.5 rounded-2xl">
             + New Visit
           </button>
         </div>
       ) : (
-        <>
-          <div className="bg-field-card border border-field-line rounded-xl p-3 md:p-3.5 mb-5">
-            <div className="flex flex-col md:flex-row md:items-center gap-2.5">
-              <div className="relative flex-1 min-w-0">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-field-muted pointer-events-none"><SearchIcon /></span>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by property name…"
-                  className="w-full bg-field-panel border border-field-line rounded-lg pl-9 pr-3 py-2.5 text-field-text text-sm"
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6 lg:items-start">
+          {/* Map — a product surface, pinned while cards scroll */}
+          <div className="sticky top-0 z-10 lg:z-0 lg:top-4 -mx-4 px-4 md:mx-0 md:px-0 pt-1 pb-3 bg-field-bg/95 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-none lg:p-0">
+            <div className="relative">
+              <Suspense fallback={<div className="h-[36vh] min-h-[300px] lg:h-[calc(100vh-130px)] rounded-3xl border border-field-line skeleton" aria-label="Loading map" />}>
+                <PortfolioMap
+                  items={sorted}
+                  selectedId={selectedId}
+                  onSelect={handleSelect}
+                  compareMode={compareMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelected}
+                  search={search}
+                  onSearchChange={setSearch}
+                  onPickSuggestion={handleSelect}
+                  className="h-[36vh] min-h-[300px] lg:h-[calc(100vh-130px)] shadow-[var(--shadow-md)]"
                 />
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
+              </Suspense>
+              {sorted.length === 0 && (
+                <div className="absolute inset-0 z-[600] grid place-items-center p-6 pointer-events-none">
+                  <div className="ps-map-float rounded-3xl p-6 text-center max-w-xs pointer-events-auto ps-sheet-up">
+                    <p className="font-display text-field-text text-xl">No matching plots</p>
+                    <p className="text-field-muted text-sm mt-1.5">Your current search and filters are too restrictive.</p>
+                    <button onClick={clearFilters} className="mt-4 bg-field-accent text-sm font-semibold px-5 py-2.5 rounded-xl">
+                      Adjust filters
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Control deck + cards */}
+          <div className="min-w-0">
+            <div className="bg-field-card border border-field-line rounded-2xl p-3.5 mb-4">
+              <div className="flex items-center gap-2">
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortKey)}
-                  className="bg-field-panel border border-field-line rounded-lg pl-3 pr-2 py-2.5 text-field-text text-xs md:w-44"
+                  aria-label="Sort properties"
+                  className="flex-1 min-w-0 bg-field-panel border border-field-line rounded-xl pl-3 pr-2 py-2.5 text-field-text text-xs"
                 >
                   {SORT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                 </select>
                 <button
-                  onClick={() => canUse(plan,"portfolio_compare") ? (compareMode ? exitCompareMode() : setCompareMode(true)) : alert("Property comparison is available on Plot Scout Pro.")}
-                  className={`text-xs rounded-lg px-3 py-2.5 border font-medium whitespace-nowrap shrink-0 ${
-                    compareMode ? "bg-field-accent text-field-bg border-field-accent" : "bg-field-panel text-field-accent border-field-accent/40"
+                  onClick={() => canUse(plan, "portfolio_compare") ? (compareMode ? exitCompareMode() : setCompareMode(true)) : alert("Property comparison is available on Plot Scout Pro.")}
+                  className={`text-xs rounded-xl px-4 py-2.5 border font-semibold whitespace-nowrap shrink-0 ${
+                    compareMode ? "bg-field-accent border-field-accent" : "bg-field-panel text-field-accent border-field-accent/40"
                   }`}
                 >
-                  {compareMode ? "Cancel" : canUse(plan,"portfolio_compare") ? "Compare" : "Compare · Pro"}
+                  {compareMode ? "Cancel" : canUse(plan, "portfolio_compare") ? "Compare" : "Compare · Pro"}
                 </button>
               </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto pt-3 -mx-0.5 px-0.5" role="group" aria-label="Filter by decision">
+                {STATUS_FILTERS.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setStatusFilter(f.id)}
+                    aria-pressed={statusFilter === f.id}
+                    className={`text-xs rounded-full px-3.5 py-2 border whitespace-nowrap transition-colors ${
+                      statusFilter === f.id
+                        ? "bg-field-accent border-field-accent font-semibold"
+                        : "bg-field-panel text-field-muted border-field-line hover:border-field-lineStrong"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {compareMode && (
+                <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-field-line ps-fade">
+                  <p className="text-field-muted text-xs">{selectedIds.length ? `${selectedIds.length} selected` : "Select 2–5 properties to compare"}</p>
+                  <button
+                    onClick={openComparison}
+                    disabled={selectedIds.length < 2 || comparisonLoading}
+                    className="text-xs rounded-xl px-4 py-2.5 bg-field-accent font-semibold disabled:opacity-40"
+                  >
+                    {comparisonLoading ? "Loading…" : `Compare selected (${selectedIds.length})`}
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto pt-3 -mx-0.5 px-0.5">
-              {STATUS_FILTERS.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setStatusFilter(f.id)}
-                  className={`text-xs rounded-full px-3 py-1.5 border whitespace-nowrap transition-colors ${
-                    statusFilter === f.id
-                      ? "bg-field-accent text-field-bg border-field-accent font-medium"
-                      : "bg-field-panel text-field-muted border-field-line hover:border-field-lineStrong"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+            {/* Result count — filter cause → effect, stated plainly */}
+            <p className="text-field-muted text-xs mb-3 px-1" key={filterKey} aria-live="polite">
+              <span className="ps-fade inline-block" key={`${filterKey}-${sorted.length}`}>
+                Showing <strong className="text-field-text font-semibold tabular-nums">{sorted.length}</strong> of <span className="tabular-nums">{properties.length}</span> {properties.length === 1 ? "plot" : "plots"}
+              </span>
+            </p>
 
-            {compareMode && (
-              <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-field-line">
-                <p className="text-field-muted text-xs">{selectedIds.length ? `${selectedIds.length} selected` : "Select 2–5 properties to compare"}</p>
-                <button
-                  onClick={openComparison}
-                  disabled={selectedIds.length < 2 || comparisonLoading}
-                  className="text-xs rounded-lg px-3 py-2 bg-field-accent text-field-bg font-semibold disabled:opacity-40"
-                >
-                  {comparisonLoading ? "Loading…" : `Compare selected (${selectedIds.length})`}
-                </button>
+            {sorted.length > 0 && (
+              <div className="grid gap-3" key={filterKey}>
+                {sorted.map(({ property: p, score, tone }, i) => {
+                  const isSelected = selectedIds.includes(p.id);
+                  const isActive = selectedId === p.id && !compareMode;
+                  const decision = beforeTokenDecision(p);
+                  const completion = visitCompletion(p);
+                  const e = economics(p.price);
+                  const price = fmtMoney(e.effectivePrice);
+                  const perGuntha = fmtMoney(e.perGuntha);
+                  const area = e.areaGuntha ? `${Number(e.areaGuntha.toFixed(2)).toLocaleString("en-IN")} guntha`
+                    : e.areaSqft ? `${Math.round(e.areaSqft).toLocaleString("en-IN")} sq ft`
+                    : e.areaAcre ? `${Number(e.areaAcre.toFixed(2))} acre` : null;
+                  const order = compareMode && isSelected ? selectedIds.indexOf(p.id) + 1 : undefined;
+                  return (
+                    <div
+                      key={p.id}
+                      ref={(el) => { if (el) cardRefs.current.set(p.id, el); else cardRefs.current.delete(p.id); }}
+                      className="ps-property-row group relative ps-stagger scroll-mt-24"
+                      style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+                    >
+                      <button
+                        onClick={() => (compareMode ? toggleSelected(p.id) : onOpen(p.id))}
+                        aria-pressed={compareMode ? isSelected : undefined}
+                        className={`w-full text-left bg-field-card border rounded-2xl p-4 md:p-5 transition-colors ps-property-btn ${
+                          isActive ? "ps-card-active" : compareMode && isSelected ? "border-field-accent" : "border-field-line group-hover:border-field-lineStrong"
+                        } ${tone === "bad" && !compareMode && !isActive ? "ps-attn-bad" : ""}`}
+                      >
+                        <div className="flex items-start gap-3.5">
+                          {compareMode ? (
+                            <span className={`mt-0.5 w-6 h-6 rounded-lg border flex items-center justify-center text-xs font-bold shrink-0 ${
+                              isSelected ? "bg-field-accent border-field-accent" : "border-field-line text-field-muted"
+                            }`} aria-hidden="true">
+                              {order ?? ""}
+                            </span>
+                          ) : (
+                            <ScoreRing value={score.total} tone={tone} size={46} />
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-display text-field-text text-[19px] leading-tight truncate">{p.name}</p>
+                              {!compareMode && <span className="hidden md:inline-flex text-field-muted shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"><ChevronIcon /></span>}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <DecisionTag id={decision.id} label={decision.shortLabel} />
+                              <span className="text-field-muted text-[11px]">{relativeTime(p.createdAt)}</span>
+                            </div>
+
+                            {/* Economics first — the card's red square */}
+                            {(price || area || perGuntha || p.price.mainRoadDistanceM != null) && (
+                              <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 mt-3.5 pt-3.5 border-t border-field-line">
+                                {price && <div><dt className="text-[9px] uppercase tracking-[.1em] text-field-muted font-semibold">Price</dt><dd className="text-field-text text-[17px] font-bold tabular-nums mt-0.5">{price}</dd></div>}
+                                {area && <div><dt className="text-[9px] uppercase tracking-[.1em] text-field-muted font-semibold">Area</dt><dd className="text-field-text text-[17px] font-bold tabular-nums mt-0.5">{area}</dd></div>}
+                                {perGuntha && <div><dt className="text-[9px] uppercase tracking-[.1em] text-field-muted font-semibold">₹ / guntha</dt><dd className="text-field-text text-sm font-semibold tabular-nums mt-0.5">{perGuntha}</dd></div>}
+                                {p.price.mainRoadDistanceM != null && <div><dt className="text-[9px] uppercase tracking-[.1em] text-field-muted font-semibold">Main road</dt><dd className="text-field-text text-sm font-semibold tabular-nums mt-0.5">{formatDistance(p.price.mainRoadDistanceM)}</dd></div>}
+                              </dl>
+                            )}
+
+                            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 mt-3 text-[11px] text-field-muted">
+                              {p.location && <span className="inline-flex items-center gap-1"><PinIcon />{p.location.lat.toFixed(3)}, {p.location.lng.toFixed(3)}</span>}
+                              {p.photos.length > 0 && <span className="inline-flex items-center gap-1"><CameraIcon />{p.photos.length}</span>}
+                              {score.criticalFlags.length > 0 && <span className="inline-flex items-center gap-1 text-field-bad font-medium"><FlagIcon />{score.criticalFlags.length} flag{score.criticalFlags.length === 1 ? "" : "s"}</span>}
+                              <span className="inline-flex items-center gap-1.5 ml-auto">
+                                <span className="w-16 h-1 bg-field-raised rounded-full overflow-hidden inline-block"><span className="block h-full bg-field-accent rounded-full" style={{ width: `${completion}%` }} /></span>
+                                <span className="tabular-nums">{completion}%</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+
+                      {!compareMode && (
+                        <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+                          {p.location && (
+                            <a
+                              href={googleMapsPointUrl(p.location.lat, p.location.lng)}
+                              target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                              aria-label="Open in Google Maps"
+                              className="w-9 h-9 grid place-items-center rounded-xl bg-white/95 border border-field-line text-field-muted hover:text-field-accent shadow-sm"
+                            >
+                              <PinIcon />
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            aria-label={`Delete ${p.name}`}
+                            onClick={async (e) => { e.stopPropagation(); if (confirm(`Delete ${p.name}? Its saved photos will also be removed. Create a Full Backup first if you may need it later.`)) await onDelete(p.id); }}
+                            className="w-9 h-9 grid place-items-center rounded-xl bg-white/95 border border-field-line text-field-bad hover:border-field-bad/50 shadow-sm"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
-
-          {sorted.length === 0 ? (
-            <div className="bg-field-card border border-field-line rounded-xl p-6 text-center">
-              <p className="text-field-muted text-sm">No properties match this search/filter.</p>
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 gap-3">
-              {sorted.map(({ property: p, score }) => {
-                const isSelected = selectedIds.includes(p.id);
-                const decision = beforeTokenDecision(p);
-                const tone = decisionTone(decision.id);
-                const completion = visitCompletion(p);
-                return (
-                  <div key={p.id} className="ps-property-row group relative">
-                    <button
-                      onClick={() => (compareMode ? toggleSelected(p.id) : onOpen(p.id))}
-                      className={`w-full text-left bg-field-card border rounded-xl p-4 transition-colors ps-property-btn ${
-                        compareMode && isSelected ? "border-field-accent" : "border-field-line group-hover:border-field-lineStrong"
-                      } ${tone === "bad" && !compareMode ? "ps-attn-bad" : ""}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        {compareMode ? (
-                          <span
-                            className={`mt-1 w-5 h-5 rounded border flex items-center justify-center text-xs shrink-0 ${
-                              isSelected ? "bg-field-accent text-field-bg border-field-accent" : "border-field-line text-field-muted"
-                            }`}
-                          >
-                            {isSelected ? "✓" : ""}
-                          </span>
-                        ) : (
-                          <ScoreRing value={score.total} tone={tone} />
-                        )}
-
-                        <div className="min-w-0 flex-1">
-                          <div className={`flex items-start justify-between gap-2 ${!compareMode ? "pr-16" : ""}`}>
-                            <p className="text-field-text font-semibold truncate leading-tight">{p.name}</p>
-                            {!compareMode && <span className="hidden md:inline-flex text-field-muted shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><ChevronIcon /></span>}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <DecisionTag id={decision.id} label={decision.shortLabel} />
-                            <span className="text-field-muted text-[11px]">{relativeTime(p.createdAt)}</span>
-                          </div>
-
-                          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2.5 text-[11px] text-field-muted">
-                            {p.location && <span className="inline-flex items-center gap-1"><PinIcon />{p.location.lat.toFixed(3)}, {p.location.lng.toFixed(3)}</span>}
-                            {p.price.quotedPrice && <span className="inline-flex items-center gap-1"><TagIcon />₹{p.price.quotedPrice.toLocaleString("en-IN")}</span>}
-                            {p.price.areaSqft && <span className="inline-flex items-center gap-1"><RulerIcon />{p.price.areaSqft.toLocaleString("en-IN")} sq ft</span>}
-                          </div>
-
-                          <div className="flex items-center gap-2 mt-3">
-                            <div className="h-1 flex-1 bg-field-raised rounded-full overflow-hidden"><div className="h-full bg-field-accent rounded-full" style={{ width: `${completion}%` }} /></div>
-                            <span className="text-field-muted text-[10px] tabular-nums shrink-0">{completion}%</span>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-
-                    {!compareMode && (
-                      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
-                        {p.location && (
-                          <a
-                            href={googleMapsPointUrl(p.location.lat, p.location.lng)}
-                            target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
-                            aria-label="Open in Google Maps"
-                            className="w-8 h-8 grid place-items-center rounded-lg bg-field-bg/90 border border-field-line text-field-muted hover:text-field-accent"
-                          >
-                            <PinIcon />
-                          </a>
-                        )}
-                        <button
-                          type="button"
-                          aria-label="Delete property"
-                          onClick={async (e) => { e.stopPropagation(); if (confirm(`Delete ${p.name}? Its saved photos will also be removed. Create a Full Backup first if you may need it later.`)) await onDelete(p.id); }}
-                          className="w-8 h-8 grid place-items-center rounded-lg bg-field-bg/90 border border-field-line text-field-bad hover:border-field-bad/50"
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </>
+        </div>
       )}
 
-      {showComparison && comparisonProperties.length >= 2 && <Suspense fallback={<div className="fixed inset-0 z-50 bg-field-bg/90 flex items-center justify-center text-field-muted text-sm">Preparing comparison…</div>}><PropertyComparison properties={comparisonProperties} onClose={() => setShowComparison(false)} /></Suspense>}
+      {showComparison && comparisonProperties.length >= 2 && (
+        <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center text-field-muted text-sm">Preparing comparison…</div>}>
+          <PropertyComparison properties={comparisonProperties} onClose={() => setShowComparison(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }
