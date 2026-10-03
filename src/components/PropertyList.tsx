@@ -125,6 +125,25 @@ export default function PropertyList({
     }
   }, [filtered, sortBy]);
 
+  /* Portfolio hero stats — computed from existing data only, never invented. */
+  const portfolioStats = useMemo(() => {
+    let total = 0, priced = 0, perGunthaSum = 0, perGunthaN = 0, scoreSum = 0, flagged = 0;
+    for (const { property: p, score } of scored) {
+      const e = economics(p.price);
+      if (e.effectivePrice != null) { total += e.effectivePrice; priced++; }
+      if (e.perGuntha != null) { perGunthaSum += e.perGuntha; perGunthaN++; }
+      scoreSum += score.total;
+      if (score.criticalFlags.length > 0) flagged++;
+    }
+    return {
+      total,
+      priced,
+      avgPerGuntha: perGunthaN > 0 ? perGunthaSum / perGunthaN : null,
+      avgScore: scored.length > 0 ? Math.round(scoreSum / scored.length) : null,
+      flagged,
+    };
+  }, [scored]);
+
   function scrollCardIntoView(id: string) {
     requestAnimationFrame(() => {
       cardRefs.current.get(id)?.scrollIntoView({
@@ -168,24 +187,61 @@ export default function PropertyList({
 
   return (
     <div className="px-4 md:px-8 pt-5 md:pt-7 max-w-xl mx-auto pb-28 md:pb-12">
-      {/* Header — red-square: the portfolio itself */}
-      <div className="flex items-end justify-between mb-4">
-        <div>
-          <p className="text-[10px] uppercase tracking-[.18em] text-field-accent font-bold mb-1.5">Field portfolio</p>
-          <h2 className="font-display text-[30px] md:text-[36px] leading-none text-field-text">Saved Properties</h2>
+      {/* Portfolio hero — Fundrise-style: one hero value, then quiet context.
+          Editorial, not dashboard: no stat-card grid, no pills. */}
+      {properties.length > 0 && (
+      <section aria-label="Portfolio summary" className="mb-6 md:mb-8 ps-rise">
+        <div className="flex items-end justify-between">
+          <h2 className="font-display text-[30px] md:text-[36px] leading-none text-field-text">Portfolio</h2>
+          <p className="text-field-muted text-xs tabular-nums shrink-0 pb-1">
+            {properties.length} {properties.length === 1 ? "plot" : "plots"}
+          </p>
         </div>
-        <div className="text-right shrink-0 pb-0.5">
-          <p className="text-field-text text-2xl font-bold leading-none tabular-nums" key={properties.length} >{properties.length}</p>
-          <p className="text-field-muted text-[10px] mt-1 uppercase tracking-[.08em]">{properties.length === 1 ? "record" : "records"}</p>
+
+        <div className="mt-6 md:mt-7">
+          <p className="ps-kicker">{portfolioStats.priced > 0 ? "Portfolio value" : "Plots tracked"}</p>
+          <p className="font-display text-field-text leading-[1.05] mt-2 tabular-nums text-[var(--text-hero)]">
+            {portfolioStats.priced > 0 ? fmtMoney(portfolioStats.total) : String(properties.length)}
+          </p>
+          <p className="text-field-muted text-[13px] mt-2">
+            {portfolioStats.priced > 0
+              ? `Across ${properties.length} ${properties.length === 1 ? "plot" : "plots"}${
+                  portfolioStats.priced < properties.length
+                    ? ` · ${portfolioStats.priced} with price data`
+                    : ""
+                }`
+              : "Add price data during visits to see portfolio value"}
+          </p>
         </div>
-      </div>
+
+        <dl className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-field-line">
+          <div>
+            <dt className="text-[10px] uppercase tracking-[.1em] text-field-muted font-semibold">Avg ₹/guntha</dt>
+            <dd className="font-display text-field-text text-[20px] mt-1 tabular-nums">
+              {portfolioStats.avgPerGuntha != null ? fmtMoney(portfolioStats.avgPerGuntha) : "–"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[10px] uppercase tracking-[.1em] text-field-muted font-semibold">Avg score</dt>
+            <dd className="font-display text-field-text text-[20px] mt-1 tabular-nums">
+              {portfolioStats.avgScore != null ? portfolioStats.avgScore : "–"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[10px] uppercase tracking-[.1em] text-field-muted font-semibold">Flagged</dt>
+            <dd className="font-display text-field-text text-[20px] mt-1 tabular-nums">
+              {portfolioStats.flagged}
+            </dd>
+          </div>
+        </dl>
+      </section>)}
 
       {properties.length === 0 ? (
-        <div className="bg-field-card border border-field-line rounded-3xl p-8 md:p-12 text-center ps-rise">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-field-panel border border-field-line grid place-items-center text-field-accent"><PinIcon /></div>
-          <p className="font-display text-field-text text-[22px] mt-5">No property visits saved yet</p>
-          <p className="text-field-muted text-sm mt-2 max-w-sm mx-auto leading-relaxed">Start your first visit to capture a location, evidence and price signal — Plot Scout builds the decision record as you go.</p>
-          <button onClick={onNew} className="mt-6 bg-field-accent text-sm font-semibold px-7 py-3.5 rounded-2xl">
+        <div className="border border-field-line rounded-3xl px-8 py-12 md:p-14 text-center ps-rise mt-2">
+          <p className="ps-kicker">Get started</p>
+          <p className="font-display text-field-text text-[26px] md:text-[30px] leading-tight mt-3">No property visits saved yet</p>
+          <p className="text-field-muted text-sm mt-3 max-w-sm mx-auto leading-relaxed">Start your first visit to capture a location, evidence and price signal — Plot Scout builds the decision record as you go.</p>
+          <button onClick={onNew} className="mt-7 bg-field-accent text-sm font-semibold px-7 py-3.5 rounded-xl">
             + New Visit
           </button>
         </div>
@@ -222,58 +278,61 @@ export default function PropertyList({
             </div>
           </div>
 
-          {/* Control deck + cards */}
+          {/* Control deck — quiet controls on canvas, not a card. Filters are
+              text with an active indicator, never pills. */}
           <div className="min-w-0">
-            <div className="bg-field-card border border-field-line rounded-2xl p-3.5 mb-4">
-              <div className="flex items-center gap-2">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortKey)}
-                  aria-label="Sort properties"
-                  className="flex-1 min-w-0 bg-field-panel border border-field-line rounded-xl pl-3 pr-2 py-2.5 text-field-text text-xs"
-                >
-                  {SORT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
-                <button
-                  onClick={() => canUse(plan, "portfolio_compare") ? (compareMode ? exitCompareMode() : setCompareMode(true)) : alert("Property comparison is available on Plot Scout Pro.")}
-                  className={`text-xs rounded-xl px-4 py-2.5 border font-semibold whitespace-nowrap shrink-0 ${
-                    compareMode ? "bg-field-accent border-field-accent" : "bg-field-panel text-field-accent border-field-accent/40"
-                  }`}
-                >
-                  {compareMode ? "Cancel" : canUse(plan, "portfolio_compare") ? "Compare" : "Compare · Pro"}
-                </button>
-              </div>
+          <div className="mb-5">
+            <div className="flex items-center gap-2">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
+                aria-label="Sort properties"
+                className="flex-1 min-w-0 border border-field-line rounded-xl pl-3 pr-2 py-2.5 text-field-text text-xs"
+              >
+                {SORT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+              <button
+                onClick={() => canUse(plan, "portfolio_compare") ? (compareMode ? exitCompareMode() : setCompareMode(true)) : alert("Property comparison is available on Plot Scout Pro.")}
+                className={`text-xs rounded-xl px-4 py-2.5 border font-semibold whitespace-nowrap shrink-0 ${
+                  compareMode ? "bg-field-accent border-field-accent" : "text-field-accent border-field-line hover:border-field-lineStrong"
+                }`}
+              >
+                {compareMode ? "Cancel" : canUse(plan, "portfolio_compare") ? "Compare" : "Compare · Pro"}
+              </button>
+            </div>
 
-              <div className="flex items-center gap-2 overflow-x-auto pt-3 -mx-0.5 px-0.5" role="group" aria-label="Filter by decision">
-                {STATUS_FILTERS.map((f) => (
+            <div className="flex items-center gap-1 overflow-x-auto mt-1" role="group" aria-label="Filter by decision">
+              {STATUS_FILTERS.map((f) => {
+                const active = statusFilter === f.id;
+                return (
                   <button
                     key={f.id}
                     onClick={() => setStatusFilter(f.id)}
-                    aria-pressed={statusFilter === f.id}
-                    className={`text-xs rounded-full px-3.5 py-2 border whitespace-nowrap transition-colors ${
-                      statusFilter === f.id
-                        ? "bg-field-accent border-field-accent font-semibold"
-                        : "bg-field-panel text-field-muted border-field-line hover:border-field-lineStrong"
+                    aria-pressed={active}
+                    className={`relative text-[13px] px-3 whitespace-nowrap transition-colors ${
+                      active ? "text-field-accent font-semibold" : "text-field-muted hover:text-field-text"
                     }`}
                   >
                     {f.label}
+                    {active && <span className="absolute left-3 right-3 bottom-1 h-0.5 rounded-full bg-field-accent" aria-hidden="true" />}
                   </button>
-                ))}
-              </div>
-
-              {compareMode && (
-                <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-field-line ps-fade">
-                  <p className="text-field-muted text-xs">{selectedIds.length ? `${selectedIds.length} selected` : "Select 2–5 properties to compare"}</p>
-                  <button
-                    onClick={openComparison}
-                    disabled={selectedIds.length < 2 || comparisonLoading}
-                    className="text-xs rounded-xl px-4 py-2.5 bg-field-accent font-semibold disabled:opacity-40"
-                  >
-                    {comparisonLoading ? "Loading…" : `Compare selected (${selectedIds.length})`}
-                  </button>
-                </div>
-              )}
+                );
+              })}
             </div>
+
+            {compareMode && (
+              <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-field-line ps-fade">
+                <p className="text-field-muted text-xs">{selectedIds.length ? `${selectedIds.length} selected` : "Select 2–5 properties to compare"}</p>
+                <button
+                  onClick={openComparison}
+                  disabled={selectedIds.length < 2 || comparisonLoading}
+                  className="text-xs rounded-xl px-4 py-2.5 bg-field-accent font-semibold disabled:opacity-40"
+                >
+                  {comparisonLoading ? "Loading…" : `Compare selected (${selectedIds.length})`}
+                </button>
+              </div>
+            )}
+          </div>
 
             {/* Result count — filter cause → effect, stated plainly */}
             <p className="text-field-muted text-xs mb-3 px-1" key={filterKey} aria-live="polite">
@@ -283,7 +342,7 @@ export default function PropertyList({
             </p>
 
             {sorted.length > 0 && (
-              <div className="grid gap-3" key={filterKey}>
+              <div className="grid gap-4" key={filterKey}>
                 {sorted.map(({ property: p, score, tone }, i) => {
                   const isSelected = selectedIds.includes(p.id);
                   const isActive = selectedId === p.id && !compareMode;
@@ -306,7 +365,7 @@ export default function PropertyList({
                       <button
                         onClick={() => (compareMode ? toggleSelected(p.id) : onOpen(p.id))}
                         aria-pressed={compareMode ? isSelected : undefined}
-                        className={`w-full text-left bg-field-card border rounded-2xl p-4 md:p-5 transition-colors ps-property-btn ${
+                        className={`w-full text-left border border-field-line rounded-2xl p-5 md:p-6 transition-colors ps-property-btn ${
                           isActive ? "ps-card-active" : compareMode && isSelected ? "border-field-accent" : "border-field-line group-hover:border-field-lineStrong"
                         } ${tone === "bad" && !compareMode && !isActive ? "ps-attn-bad" : ""}`}
                       >
@@ -361,7 +420,7 @@ export default function PropertyList({
                               href={googleMapsPointUrl(p.location.lat, p.location.lng)}
                               target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
                               aria-label="Open in Google Maps"
-                              className="w-11 h-11 grid place-items-center rounded-xl bg-white/95 border border-field-line text-field-muted hover:text-field-accent shadow-sm"
+                              className="w-11 h-11 grid place-items-center rounded-xl ps-surface-float border border-field-line text-field-muted hover:text-field-accent shadow-sm"
                             >
                               <PinIcon />
                             </a>
@@ -370,7 +429,7 @@ export default function PropertyList({
                             type="button"
                             aria-label={`Delete ${p.name}`}
                             onClick={async (e) => { e.stopPropagation(); if (confirm(`Delete ${p.name}? Its saved photos will also be removed. Create a Full Backup first if you may need it later.`)) await onDelete(p.id); }}
-                            className="w-11 h-11 grid place-items-center rounded-xl bg-white/95 border border-field-line text-field-bad hover:border-field-bad/50 shadow-sm"
+                            className="w-11 h-11 grid place-items-center rounded-xl ps-surface-float border border-field-line text-field-bad hover:border-field-bad/50 shadow-sm"
                           >
                             <TrashIcon />
                           </button>
